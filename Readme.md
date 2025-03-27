@@ -1,0 +1,1 @@
+Collection of scripts that interface with league api and process data to a local database
