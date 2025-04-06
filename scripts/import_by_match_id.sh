@@ -76,7 +76,7 @@ process_match() {
         result="lose"
     fi
 
-    mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+    mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
     "INSERT INTO games (game_id, game_date, result, duration, queue_id, game_version, game_mode, game_type)
     VALUES ('$game_id', '$game_date', '$result', $duration, $queue_id, '$(mysql_escape "$game_version")', '$(mysql_escape "$game_mode")', '$(mysql_escape "$game_type")')
     ON DUPLICATE KEY UPDATE game_date=VALUES(game_date), result=VALUES(result), duration=VALUES(duration);"
@@ -93,13 +93,13 @@ process_match() {
         dragon_kills=$(echo "$team" | jq -r '.objectives.dragon.kills')
         baron_kills=$(echo "$team" | jq -r '.objectives.baron.kills')
 
-        mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+        mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
         "INSERT INTO match_teams (game_id, team_id_api, win, bans, first_baron, first_dragon, dragon_kills, baron_kills)
         VALUES ('$game_id', '$team_id_api', $win, '$(mysql_escape "$bans")', $first_baron, $first_dragon, $dragon_kills, $baron_kills)
         ON DUPLICATE KEY UPDATE win=VALUES(win), bans=VALUES(bans), first_baron=VALUES(first_baron), first_dragon=VALUES(first_dragon), dragon_kills=VALUES(dragon_kills), baron_kills=VALUES(baron_kills);"
 
         # Get inserted team ID
-        team_id=$(mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
+        team_id=$(mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
         "SELECT team_id FROM match_teams WHERE game_id = '$game_id' AND team_id_api = '$team_id_api';")
 
         if [ -z "$team_id" ]; then
@@ -111,7 +111,7 @@ process_match() {
         for objective_type in dragon baron herald tower; do
             count=$(echo "$team" | jq -r ".objectives.${objective_type}.kills")
             if [ "$count" != "null" ]; then
-                mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+                mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
                 "INSERT INTO objectives (game_id, team_id, objective_type, count)
                 VALUES ('$game_id', $team_id, '$objective_type', $count)
                 ON DUPLICATE KEY UPDATE count=VALUES(count);"
@@ -134,7 +134,7 @@ process_match() {
         riot_id_tag=$(echo "$participant" | jq -r '.riotIdTagline')
 
         # Insert/update player
-        mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+        mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
         "INSERT INTO players (puuid, name, summonerId, profileIcon, summonerLevel, riotIdGameName, riotIdTagline)
         VALUES ('$puuid_val', '$summoner_name_escaped', '$summoner_id', $profile_icon, $summoner_level, 
                 '$(mysql_escape "$riot_id_game")', '$(mysql_escape "$riot_id_tag")')
@@ -150,7 +150,7 @@ process_match() {
         team_id_api=$(echo "$participant" | jq -r '.teamId')
         
         # Get team ID
-        team_id=$(mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
+        team_id=$(mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
         "SELECT team_id FROM match_teams WHERE game_id = '$game_id' AND team_id_api = '$team_id_api';")
 
         if [ -z "$team_id" ]; then
@@ -159,17 +159,17 @@ process_match() {
         fi
 
         # Insert champion
-        mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+        mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
         "INSERT INTO champions (name, championId)
         VALUES ('$champion_name_escaped', $champion_id)
         ON DUPLICATE KEY UPDATE name = VALUES(name);"
 
         # Get champion DB ID
-        champion_db_id=$(mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
+        champion_db_id=$(mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
         "SELECT id FROM champions WHERE championId = $champion_id;")
 
         # Get player DB ID
-        player_db_id=$(mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
+        player_db_id=$(mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
         "SELECT id FROM players WHERE puuid = '$puuid_val';")
 
         # Insert participant
@@ -177,7 +177,7 @@ process_match() {
         individual_position=$(echo "$participant" | jq -r '.individualPosition')
         lane=$(echo "$participant" | jq -r '.lane')
         
-        mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+        mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
         "INSERT INTO participants (
             game_id, player_id, champion_id, team_id, puuid,
             kills, deaths, assists, champ_level, gold_earned,
@@ -211,7 +211,7 @@ process_match() {
             assists = VALUES(assists);"
 
         # Get participant ID
-        participant_id=$(mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
+        participant_id=$(mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -sN -e \
         "SELECT participant_id FROM participants WHERE game_id = '$game_id' AND puuid = '$puuid_val';")
 
         if [ -z "$participant_id" ]; then
@@ -223,7 +223,7 @@ process_match() {
         for slot in {0..6}; do
             item_id=$(echo "$participant" | jq -r ".item$slot")
             if [ "$item_id" -ne 0 ] && [ "$item_id" != "null" ]; then
-                mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+                mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
                 "INSERT INTO participant_items (participant_id, slot_number, item_id)
                 VALUES ($participant_id, $slot, $item_id)
                 ON DUPLICATE KEY UPDATE item_id = VALUES(item_id);"
@@ -318,7 +318,7 @@ process_match() {
                 ward_takedowns_before20=$(echo "$challenges" | jq -r '.wardTakedownsBefore20M // 0')
                 wards_guarded=$(echo "$challenges" | jq -r '.wardsGuarded // 0')
 
-                mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+                mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
                 "INSERT INTO participant_challenges (
                     participant_id, kda, kill_participation, total_heal,
                     vision_per_minute, gold_per_minute, damage_per_minute, turret_takedowns,
@@ -522,7 +522,7 @@ process_match() {
             style_type=$(echo "$style" | jq -r '.description | sub("primaryStyle"; "primary") | sub("subStyle"; "sub")')
             style_id=$(echo "$style" | jq -r '.style')
 
-            mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+            mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
             "INSERT INTO participant_perks_styles (participant_id, style_type, style_id)
             VALUES ($participant_id, '$style_type', $style_id)
             ON DUPLICATE KEY UPDATE style_id = VALUES(style_id);"
@@ -534,7 +534,7 @@ process_match() {
                 var2=$(echo "$selection" | jq -r '.var2')
                 var3=$(echo "$selection" | jq -r '.var3')
 
-                mysql -h $DB_HOST -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
+                mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p$DB_PASS -D $DB_NAME -e \
                 "INSERT INTO participant_perks_selections (
                     participant_id, style_type, perk_id, var1, var2, var3, selection_order
                 )
